@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文明6：绝望跳水模拟器 V5.0 (巴比伦飞天版)</title>
+    <style>
+        :root {
+            --civ-gold: #c6a664;
+            --civ-blue: #1c2e4a;
+            --civ-dark: #0f1a2b;
+            --text-light: #e0e0e0;
+            --win-green: #2ecc71;
+            --lose-red: #e74c3c;
+            --special-purple: #9b59b6;
+        }
+
+        body {
+            background-color: var(--civ-dark);
+            color: var(--text-light);
+            font-family: 'Georgia', 'Times New Roman', serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        #game-container {
+            background: linear-gradient(145deg, #16243b, #0d1624);
+            border: 2px solid var(--civ-gold);
+            border-radius: 10px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        h1 {
+            color: var(--civ-gold);
+            margin-bottom: 5px;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: text-shadow 0.3s;
+        }
+        
+        h1:hover {
+            text-shadow: 0 0 10px var(--civ-gold);
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: #889bb5;
+            margin-bottom: 20px;
+            font-style: italic;
+        }
+
+        .screen { display: none; }
+        .active-screen { display: block; }
+
+        #loading-screen {
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .quote {
+            font-size: 18px;
+            line-height: 1.6;
+            margin: 15px 0;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .loader-bar {
+            width: 80%;
+            height: 4px;
+            background: #333;
+            margin-top: 20px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .loader-progress {
+            width: 0%;
+            height: 100%;
+            background: var(--civ-gold);
+            transition: width 0.1s linear;
+        }
+
+        .card {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--civ-gold);
+            text-align: left;
+        }
+
+        .label { color: #889bb5; font-size: 12px; text-transform: uppercase; }
+        .value { font-size: 16px; font-weight: bold; margin-top: 5px; }
+
+        .comment {
+            font-style: italic;
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.5);
+            text-align: center;
+            min-height: 20px;
+        }
+
+        #outcome-title { font-size: 28px; font-weight: bold; margin-bottom: 20px; }
+        #outcome-desc { font-size: 16px; line-height: 1.6; margin-bottom: 30px; padding: 20px; background: rgba(255,255,255,0.05); border-radius: 8px; text-align: left;}
+
+        .btn-group { margin-top: 20px; display: flex; gap: 10px; }
+        button { border: none; padding: 12px 20px; font-family: inherit; font-weight: bold; cursor: pointer; transition: all 0.2s; text-transform: uppercase; border-radius: 4px; flex: 1; }
+        .btn-restart { background-color: var(--civ-gold); color: var(--civ-dark); font-size: 16px; }
+        .btn-restart:hover { background-color: #d4b470; transform: scale(1.02); }
+        .btn-play { background-color: transparent; border: 1px solid #889bb5; color: #889bb5; }
+        .btn-play:hover { background-color: rgba(136, 155, 181, 0.1); color: white; }
+
+        #stats { margin-top: 20px; font-size: 12px; color: #666; border-top: 1px solid #333; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1 onclick="triggerGodMode()" style="cursor: pointer; user-select: none;" title="作弊通道：点击随机进入一个特殊剧本">
+        Civ VI: Diving Simulator
+    </h1>
+    <div class="subtitle">"下一回合... 科技树已被打乱..."</div>
+
+    <div id="loading-screen" class="screen" style="display:none;">
+        <div id="quote-text" class="quote"></div>
+        <div class="loader-bar">
+            <div id="loader-progress" class="loader-progress"></div>
+        </div>
+        <div style="margin-top:10px; font-size:12px; color:#666;">正在计算蛮族移动路径...</div>
+    </div>
+
+    <div id="result-screen" class="screen">
+        <div class="card">
+            <div class="label">领袖 & 文明</div>
+            <div class="value" id="civ-name">???</div>
+        </div>
+        
+        <div class="card">
+            <div class="label">出生地概况</div>
+            <div class="value" id="terrain-info">???</div>
+        </div>
+
+        <div class="card">
+            <div class="label">周边资源</div>
+            <div class="value" id="resource-info">???</div>
+        </div>
+
+        <div class="comment" id="system-comment">
+            评价加载中...
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-restart" onclick="startDive()">🔄 垃圾图，重开 (跳水)</button>
+            <button class="btn-play" onclick="playGame()">✅ 就玩这把了</button>
+        </div>
+    </div>
+
+    <div id="outcome-screen" class="screen">
+        <div id="outcome-title">游戏结束</div>
+        <div id="outcome-desc">描述文本</div>
+        <button class="btn-restart" onclick="startDive()">🔄 再来一把</button>
+    </div>
+
+    <div id="stats">
+        已重开次数: <span id="restart-count">0</span> | 浪费的人生: <span id="time-wasted">0</span>秒
+    </div>
+</div>
+
+<script>
+    // === 基础数据 ===
+    const data = {
+        civs: [
+            "秦始皇 (中国)", "彼得大帝 (俄罗斯)", "曼沙·穆萨 (马里)", 
+            "约翰·柯廷 (澳大利亚)", "帕查库特克 (印加)", "维多利亚 (英国)", 
+            "蒙特祖玛 (阿兹特克)", "库佩 (毛利)", "托米丽司 (斯基泰)", 
+            "汉谟拉比 (巴比伦)", "若昂三世 (葡萄牙)", "成吉思汗 (蒙古)"
+        ],
+        terrains: [
+            { text: "平坦的雪原 (无淡水)", score: -10, type: "snow" },
+            { text: "广阔的平沙 (沙漠丘陵)", score: -5, type: "desert" },
+            { text: "草原丘陵 (沿河)", score: 8, type: "grass" }, // 巴比伦需要这个
+            { text: "被群山包围 (死胡同)", score: -2, type: "mountain" },
+            { text: "冻土丘陵 (有树)", score: 2, type: "tundra" },
+            { text: "海岛 (深海)", score: 0, type: "ocean" },
+            { text: "平原雨林 (高产出)", score: 5, type: "plains" }
+        ],
+        resources: [
+            { text: "啥也没有", score: -5 },
+            { text: "只有一只羊", score: 0 },
+            { text: "大米 + 石头", score: 3 },
+            { text: "香料 (奢侈)", score: 8 },
+            { text: "帕依提提 (自然奇观)", score: 999 },
+            { text: "多佛白崖 (自然奇观)", score: 1 },
+            { text: "煤 (工业时代的黑金)", score: 4 } 
+        ]
+    };
+
+    // === 剧情剧本系统 ===
+    let activeScenario = null; 
+
+    const scenarios = [
+        {
+            // 巴比伦 + 沿河 (鲁尔山谷流)
+            // 鲁尔山谷必须沿河，且需要工业区。
+            check: (c, t, r) => c.includes("巴比伦") && t.text.includes("沿河"),
+            forceParams: { civKeyword: "巴比伦", terrainType: "grass" },
+            name: "时空特异点",
+            comment: "汉谟拉比 + 沿河丘陵！鲁尔山谷图纸已就绪，准备在古典时代起飞！",
+            outcomes: [
+                { type: "win", text: "【降维打击】你利用高产能速出了“鲁尔山谷”，触发【飞行】尤里卡。当邻居还在研究如何使用投石车时，你的双翼机已经开始在他们头上拉屎了。" },
+                { type: "lose", text: "【缺油的悲剧】你成功在公元前解锁了双翼机，但你发现地图上没有石油。你的空军只能停在机场当模型，最后被蛮族勇士用木棒敲烂了。" },
+                { type: "lose", text: "【严重的偏科生】你只顾着冲工业奇观，家里没有兵。在鲁尔山谷建成的前一回合，邻居斯基泰的骑手大军冲进了你的首都。奇观误国啊！" }
+            ]
+        },
+        {
+            // 秦始皇 + 沙漠
+            check: (c, t, r) => c.includes("秦始皇") && t.type === "desert",
+            forceParams: { civKeyword: "秦始皇", terrainType: "desert" },
+            name: "大建奇观",
+            comment: "秦始皇 + 沙漠！这把如果不造大金字塔，和咸鱼有什么区别？",
+            outcomes: [
+                { type: "win", text: "【奇观胜利】你手搓了金字塔、佩特拉、神谕。沙漠变成了黄金城，游客挤爆了你的边境。你不需要造兵，奇观就是你的长城！" },
+                { type: "lose", text: "【奇观误国】你在手搓大金字塔的最后1回合，被隔壁的埃及抢先了。你心态崩了，把鼠标摔了。游戏结束。" },
+                { type: "lose", text: "【贪婪的代价】你造好了大金字塔，但是家里没有一个兵。第30回合，蛮族骑兵大队光临，你的奇观现在归蛮族了。" }
+            ]
+        },
+        {
+            // 马里 + 沙漠
+            check: (c, t, r) => c.includes("马里") && t.type === "desert",
+            forceParams: { civKeyword: "马里", terrainType: "desert" },
+            name: "黄金国度",
+            comment: "曼沙·穆萨 + 沙漠！钱不再是问题，问题是怎么花完它。",
+            outcomes: [
+                { type: "win", text: "【金币胜利】你的钱太多了，你直接买下了所有的城邦，顺便把邻居的军队也买过来了。这叫“恶意收购”胜利。" },
+                { type: "lose", text: "【有钱没命花】虽然你每回合收入500金币，但你的生产力是0。当蛮族拿着大棒冲进来时，你还在用金子砌墙，可惜来不及了。" }
+            ]
+        },
+        {
+            // 俄罗斯 + 冻土
+            check: (c, t, r) => c.includes("俄罗斯") && (t.type === "tundra" || t.type === "snow"),
+            forceParams: { civKeyword: "俄罗斯", terrainType: "tundra" },
+            name: "核动力圣地",
+            comment: "彼得 + 冻土！极光之舞 + 职业道德已经就绪，准备起飞！",
+            outcomes: [
+                { type: "win", text: "【生产力霸权】你的修道院提供了+20生产力。你的城市像工业怪兽一样疯狂产出，你在中世纪就推平了全世界。" },
+                { type: "lose", text: "【信仰崩塌】你虽然有核动力圣地，但还没来得及发教，就被邻居拜占庭传教士骑脸洗成了异教徒。职业道德失效了，你退出了游戏。" }
+            ]
+        },
+        {
+            // 战狂
+            check: (c, t, r) => c.includes("斯基泰") || c.includes("阿兹特克"),
+            forceParams: { civKeyword: "斯基泰", terrainType: "plains" }, 
+            name: "战争机器",
+            comment: "既然选了战狂，种田是不可能种田的，这辈子都不可能种田。",
+            outcomes: [
+                { type: "win", text: "【征服胜利】第80回合，你的轻骑兵洪流已经踏平了这片大陆。没人记得你有没有文化，因为他们都死光了。" },
+                { type: "lose", text: "【穷兵黩武】你造了太多兵，导致财政赤字，兵变了。你的精锐骑手解散回家种地去了。" }
+            ]
+        }
+    ];
+
+    // 普通结局库
+    const genericEndings = {
+        win: [
+            "【科技胜利】虽然过程坎坷，但你最后还是让火箭升空了。",
+            "【外交胜利】你给全地球人每人发了一双鞋，全票当选地球球长。",
+            "【分数胜利】熬到了500回合，熬死了所有对手（物理意义上）。"
+        ],
+        lose_barbarian_tech: [
+            "【降维打击】你发现这局游戏有巴比伦。现在是远古时代，但蛮族营地里走出了拿着现代步枪的游骑兵。你的棒子兵甚至来不及求饶。",
+            "【科技代差】因为巴比伦的存在，蛮族的科技水平比你高两个时代。你的桨帆船在海上遇到了蛮族驱逐舰。"
+        ],
+        lose_standard: [
+            "【现实Gank】天亮了，你要去上班/上学了。含泪存档退出。",
+            "【甘地核平】甘地觉得你的和平指数不够，决定用核弹教你和平。",
+            "【忠诚度雪崩】你拍城拍到了艾莉诺脸书上，5回合后，那是她的城了。",
+            "【自然灾害】这局因为排碳太多，海平面上升，你的沿海首都变成了亚特兰蒂斯。"
+        ]
+    };
+
+    const quotes = [
+        "从水下的第一个生命萌芽开始...",
+        "到石器时代的巨型野兽...",
+        "再到人类第一次直立行走...",
+        "你历经劫难...",
+        "终于来到了文明的摇篮。"
+    ];
+
+    let restartCount = 0;
+    let currentScore = 0;
+    let isGodMode = false;
+
+    // === 逻辑函数 ===
+
+    function triggerGodMode() {
+        if (!isGodMode) {
+            isGodMode = true;
+            alert("🛠️ 科技树修改器已启动！\n下一把必定触发【特殊剧本】！");
+            startDive(); 
+        }
+    }
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
+        document.getElementById(id).style.display = (id === 'loading-screen') ? 'flex' : 'block';
+    }
+
+    function startDive() {
+        showScreen('loading-screen');
+        if (restartCount > 0) {} 
+        restartCount++;
+        document.getElementById('restart-count').innerText = restartCount - 1; 
+        updateTime();
+
+        // 动画
+        let quoteDiv = document.getElementById('quote-text');
+        let progressDiv = document.getElementById('loader-progress');
+        quoteDiv.style.opacity = 0;
+        progressDiv.style.width = "0%";
+        let loadInterval = setInterval(() => {
+            let w = parseFloat(progressDiv.style.width) || 0;
+            if (w >= 100) clearInterval(loadInterval);
+            progressDiv.style.width = (w + 2.5) + "%";
+        }, 30);
+        
+        quoteDiv.innerText = quotes[0];
+        quoteDiv.style.opacity = 1;
+        setTimeout(() => { quoteDiv.innerText = quotes[1]; }, 700);
+        setTimeout(() => { quoteDiv.innerText = quotes[2]; }, 1400);
+        setTimeout(() => { quoteDiv.innerText = "生成地图种子 #"+Math.floor(Math.random()*999999); }, 2100);
+
+        setTimeout(() => {
+            generateResult();
+        }, 2500);
+    }
+
+    function generateResult() {
+        showScreen('result-screen');
+        activeScenario = null; // 重置剧本
+
+        let civ, terrain, resource;
+
+        if (isGodMode) {
+            // === 作弊模式：随机抽取一个剧本 ===
+            const randomScenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+            
+            // 根据剧本的 forceParams 强制设置变量
+            civ = data.civs.find(c => c.includes(randomScenario.forceParams.civKeyword)) || "巴比伦";
+            terrain = data.terrains.find(t => t.type === randomScenario.forceParams.terrainType) || data.terrains[0];
+            
+            // 资源给好一点
+            resource = data.resources[3]; // 香料
+            if(Math.random() > 0.7) resource = data.resources[4]; 
+            
+            isGodMode = false; 
+        } else {
+            // === 正常随机 ===
+            civ = data.civs[Math.floor(Math.random() * data.civs.length)];
+            terrain = data.terrains[Math.floor(Math.random() * data.terrains.length)];
+            resource = data.resources[Math.floor(Math.random() * data.resources.length)];
+        }
+
+        document.getElementById('civ-name').innerText = civ;
+        document.getElementById('terrain-info').innerText = terrain.text;
+        document.getElementById('resource-info').innerText = resource.text;
+
+        let score = terrain.score + resource.score;
+        let commentBox = document.getElementById('system-comment');
+        let comment = "";
+        let color = "#e74c3c";
+
+        // === 1. 检测是否触发剧本 ===
+        for (let s of scenarios) {
+            if (s.check(civ, terrain, resource)) {
+                activeScenario = s;
+                comment = "⚡ 触发剧情：" + s.comment;
+                color = "var(--special-purple)"; 
+                score += 20; 
+                break;
+            }
+        }
+
+        // === 2. 没剧本则走常规 ===
+        if (!activeScenario) {
+            if (resource.text.includes("帕依提提")) {
+                comment = "帕依提提骑脸！(S级)";
+                color = "#f1c40f";
+            } else if (score < -5) {
+                comment = "这图狗看了都摇头。(F级)";
+            } else if (score < 5) {
+                comment = "平平无奇。(C级)";
+                color = "#f39c12";
+            } else {
+                comment = "哎哟，这图不错哦！(A级)";
+                color = "#2ecc71";
+            }
+        }
+
+        currentScore = score;
+        commentBox.innerText = comment;
+        commentBox.style.color = color;
+    }
+
+    function playGame() {
+        showScreen('outcome-screen');
+        let titleDiv = document.getElementById('outcome-title');
+        let descDiv = document.getElementById('outcome-desc');
+        
+        let winChance = 0.4 + (currentScore * 0.05);
+        if (winChance > 0.9) winChance = 0.9;
+        if (winChance < 0.1) winChance = 0.1;
+        let roll = Math.random();
+
+        // 1. 剧本结局
+        if (activeScenario) {
+            let outcome = activeScenario.outcomes[Math.floor(Math.random() * activeScenario.outcomes.length)];
+            if (outcome.type === 'win') {
+                titleDiv.innerText = "VICTORY / 史诗胜利";
+                titleDiv.style.color = "var(--win-green)";
+            } else {
+                titleDiv.innerText = "DEFEAT / 史诗失败";
+                titleDiv.style.color = "var(--lose-red)";
+            }
+            descDiv.innerText = outcome.text;
+            return;
+        }
+
+        // 2. 常规结局 (巴比伦彩蛋)
+        if (Math.random() < 0.1) {
+            titleDiv.innerText = "DEFEAT / 惨遭屠杀";
+            titleDiv.style.color = "var(--lose-red)";
+            descDiv.innerText = genericEndings.lose_barbarian_tech[Math.floor(Math.random() * genericEndings.lose_barbarian_tech.length)];
+            return;
+        }
+
+        if (roll < winChance) {
+            titleDiv.innerText = "VICTORY / 胜利";
+            titleDiv.style.color = "var(--win-green)";
+            descDiv.innerText = genericEndings.win[Math.floor(Math.random() * genericEndings.win.length)];
+        } else {
+            titleDiv.innerText = "DEFEAT / 失败";
+            titleDiv.style.color = "var(--lose-red)";
+            descDiv.innerText = genericEndings.lose_standard[Math.floor(Math.random() * genericEndings.lose_standard.length)];
+        }
+    }
+
+    function updateTime() {
+        let seconds = (restartCount - 1) * 30;
+        if(seconds < 0) seconds = 0;
+        document.getElementById('time-wasted').innerText = seconds;
+    }
+
+    startDive();
+</script>
+
+</body>
+</html>
